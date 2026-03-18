@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ふるさと納税ガチャ</title>
+<meta property="og:title" content="ふるさと納税ガチャ">
+<meta property="og:description" content="全国1,747自治体からランダム抽選！知らなかった自治体の返礼品に出会おう。">
+<meta property="og:image" content="https://harukapetit-gif.github.io/harukahitoritabi/ogp.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ふるさと納税ガチャ">
+<meta name="twitter:description" content="全国1,747自治体からランダム抽選！知らなかった自治体の返礼品に出会おう。">
+<meta name="twitter:image" content="https://harukapetit-gif.github.io/harukahitoritabi/ogp.jpg">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -102,6 +110,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--sand);color:var(--in
 
 /* FOOTER */
 footer{text-align:center;padding:24px 20px;font-size:9px;color:var(--ink-l);opacity:.5;letter-spacing:1.5px;font-family:'Montserrat',sans-serif;line-height:2.8;border-top:1px solid #E8DCCC;}
+.desc-loading{animation:descpulse 1.2s ease-in-out infinite;opacity:.6;font-style:italic;}
+@keyframes descpulse{0%,100%{opacity:.4}50%{opacity:.9}}
 </style>
 </head>
 <body>
@@ -1947,7 +1957,7 @@ function pick(){
   return inPref[Math.floor(Math.random()*inPref.length)];
 }
 
-function doSpin(){
+async function doSpin(){
   const btn=document.getElementById('spin-btn');
   const loading=document.getElementById('loading');
   const hdr=document.getElementById('res-hdr');
@@ -1956,18 +1966,18 @@ function doSpin(){
   btn.disabled=true;btn.classList.add('go');
   hdr.classList.remove('on');card.classList.remove('on');
   loading.classList.add('on');
-  setTimeout(()=>{
-    const m=pick();
-    showResult(m);updateStats(m);
-    loading.classList.remove('on');
-    btn.disabled=false;btn.classList.remove('go');
-    if(m.rarity==='SSR'){
-      document.getElementById('flash').classList.add('on');
-      setTimeout(()=>document.getElementById('flash').classList.remove('on'),600);
-    }
-    launchConf(m.rarity==='SSR'||m.rarity==='SR');
-    hdr.classList.add('on');
-  },1200);
+  await new Promise(r=>setTimeout(r,1200));
+  const m=pick();
+  showResult(m);updateStats(m);
+  loading.classList.remove('on');
+  btn.disabled=false;btn.classList.remove('go');
+  if(m.rarity==='SSR'){
+    document.getElementById('flash').classList.add('on');
+    setTimeout(()=>document.getElementById('flash').classList.remove('on'),600);
+  }
+  launchConf(m.rarity==='SSR'||m.rarity==='SR');
+  hdr.classList.add('on');
+  generateDesc(m);
 }
 
 function showResult(m){
@@ -1978,7 +1988,9 @@ function showResult(m){
   document.getElementById('r-pref').textContent=m.pref;
   document.getElementById('r-city').textContent=m.city;
   document.getElementById('r-region').textContent=m.region;
-  document.getElementById('r-desc').textContent=m.desc;
+  const descEl=document.getElementById('r-desc');
+  descEl.textContent='✨ 紹介文を生成中...';
+  descEl.classList.add('desc-loading');
   document.getElementById('r-emoji').textContent=m.emoji;
   document.getElementById('r-link').href=m.shop||'https://event.rakuten.co.jp/furusato/area/';
   const card=document.getElementById('res-card');
@@ -1986,6 +1998,22 @@ function showResult(m){
   card.classList.add('on');
   const borderC=m.rarity==='SSR'?'var(--gold)':m.rarity==='SR'?'#C0A8E0':'#E8DCCC';
   card.style.borderColor=borderC;
+}
+
+async function generateDesc(m){
+  const descEl=document.getElementById('r-desc');
+  try{
+    const rarLabel={N:'政令・中核市',R:'一般市',SR:'町',SSR:'村（過疎地域）'};
+    const prom='ふるさと納税ガチャアプリで「'+m.pref+'の'+m.city+'」が当たりました。返礼品や地域の魅力を2文（60字以内）で紹介して。種別「'+rarLabel[m.rarity]+'」。絵文字・記号不可。です・ます調。紹介文のみ返す。';
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:150,messages:[{role:'user',content:prom}]})});
+    const data=await res.json();
+    const text=data.content?.[0]?.text?.trim();
+    if(text){
+      descEl.classList.remove('desc-loading');
+      descEl.textContent='';
+      for(const ch of text){descEl.textContent+=ch;await new Promise(r=>setTimeout(r,18));}
+    } else {descEl.classList.remove('desc-loading');descEl.textContent=m.desc;}
+  } catch(e){descEl.classList.remove('desc-loading');descEl.textContent=m.desc;}
 }
 
 function updateStats(m){
